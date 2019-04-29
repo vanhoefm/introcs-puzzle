@@ -1,5 +1,5 @@
 add_library("minim")
-import os
+import os, random
 path = os.getcwd() # get the path of the .pyde file
 audioPlayer = Minim(this)
 
@@ -10,20 +10,22 @@ class Tile:
         self.id = id
         self.img = loadImage(path + "/images/" + str(id) + ".png")
         
-    def display(self):
-        if self.id == 15:
+    def display(self, win):
+        if not win and self.id == 15:
             return
         
         #print("Now drawing tile " + str(self.id))
         image(self.img, self.colid * 200, self.rowid * 200, 200, 200)
 
-        stroke(0, 0, 0)
-        strokeWeight(5)
-        noFill()
-        rect(self.colid * 200, self.rowid * 200, 200, 200)
-
+        if not win:
+            stroke(0, 0, 0)
+            strokeWeight(5)
+            noFill()
+            rect(self.colid * 200, self.rowid * 200, 200, 200)
+        
 class Puzzle:
     def __init__(self):
+        self.win = False
         self.tiles = []
         id = 0
         for rowid in range(4):
@@ -32,18 +34,20 @@ class Puzzle:
                 id += 1
         self.clickSound = audioPlayer.loadFile(path + "/sounds/click.mp3")
         self.bgSound = audioPlayer.loadFile(path + "/sounds/background.mp3")
+        self.winSound = audioPlayer.loadFile(path + "/sounds/win.mp3")
         #self.bgSound.play()
     
     def display(self):
         background(0)
         for tile in self.tiles:
-            tile.display()
+            tile.display(self.win)
         
-        colid = mouseX // 200
-        rowid = mouseY // 200
-        stroke(0, 255, 0)
-        rect(colid * 200, rowid * 200, 200, 200)
-        
+        if not self.win:
+            colid = mouseX // 200
+            rowid = mouseY // 200
+            stroke(0, 255, 0)
+            rect(colid * 200, rowid * 200, 200, 200)
+            
     def getTile(self, rowid, colid):
         for tile in self.tiles:
             if tile.rowid == rowid and tile.colid == colid:
@@ -74,17 +78,44 @@ class Puzzle:
                 self.swapTile(tile, neighborTile)
                 self.clickSound.rewind()
                 self.clickSound.play()
+                self.win = self.checkSolved()
                 print("Swap with", rowDirection, colDirection)
     
+    def checkSolved(self):
+        for tile in self.tiles:
+            if tile.rowid * 4 + tile.colid != tile.id:
+                return False
+            
+        self.winSound.rewind()
+        self.winSound.play()
+        return True
+    
+    def shufflePuzzle(self, difficulty=10):
+        emptyTile = self.getTile(3, 3)
+        print("Shuffling puzzle..")
+        
+        for i in range(difficulty):
+            direction = random.choice([[1,0], [-1,0], [0,1], [0,-1]])
+            rowDirection = direction[0]
+            colDirection = direction[1]
+            otherTile = self.getTile(emptyTile.rowid + rowDirection, emptyTile.colid + colDirection)
+            if otherTile != False:
+                print("Shuffle: now swapping tiles")
+                self.swapTile(emptyTile, otherTile)
         
 def setup():
     size(800, 800)
     background(0)
 
 p = Puzzle()
+p.shufflePuzzle()
 
 def draw():
     p.display()
 
 def mouseClicked():
-    p.handleMouseClick()
+    if p.win:
+        p.shufflePuzzle()
+        p.win = False
+    else:
+        p.handleMouseClick()
